@@ -1,0 +1,124 @@
+---
+
+- name: Install pip
+  hosts: all
+  become: true
+  
+  tasks:
+    - name: Update Ubuntu system
+      apt:
+        update_cache: yes
+        
+    - name: Install python-pip
+      apt:
+        name: python3-pip
+        state: present
+        
+    - name: Install curl package
+      apt:
+        name: curl
+        state: present
+        
+
+- name: Deploy Flask application
+  hosts: dev
+  become: true
+
+  tasks:
+  
+    - name: Install Requirmnets
+      pip:
+        name:
+          - net-tools
+          
+            
+    - name: Install Python and Flask
+      ansible.builtin.pip:
+        name:
+          - flask
+
+    - name: Copy Flask application script
+      ansible.builtin.copy:
+        src: application2.py
+        dest: /home/application2.py
+        mode: '0755'
+
+    - name: Copy my-app-service
+      ansible.builtin.copy:
+        src: my_flask_app.service
+        dest: /etc/systemd/system/my_flask_app.service
+        mode: '0777'
+    - name: daemon Flask application service
+      ansible.builtin.shell:
+        cmd: "systemctl daemon-reload "
+    - name: Start Flask application service
+      ansible.builtin.shell:
+        cmd: "systemctl restart my_flask_app "
+        
+
+      
+
+- hosts: haproxy
+  become: yes
+  vars:
+    Mymessage: "Haproxy"
+    algorithm:  roundrobin
+    loadbalancer_name: haproxy
+    loadbal_src_path: haproxy.cfg.j2
+    loadbal_dest_path: /etc/haproxy/haproxy.cfg
+    haproxy_host_ipv4_address: "{{ hostvars[inventory_hostname]['ansible_default_ipv4']['address'] }}"
+  tasks:
+    - name: Install Haproxy
+      become: yes 
+      apt: 
+        name: "{{loadbalancer_name}}" 
+        state:  present
+        
+    - name: Install Keepalived package
+      apt:
+        name: keepalived
+        state: present
+    
+    - name: Copy HAProxy Config File 
+      template:
+        src:  "{{loadbal_src_path}}"
+        dest: "{{loadbal_dest_path}}"
+    - name: Task9(Restart HAproxy)
+      service:  
+        name: "{{loadbalancer_name}}"
+        state: restarted
+        
+    - name: Ping HAProxy IP
+      ping:
+        data: "{{ ansible_default_ipv4.address }}"
+        
+    - name: Send HTTP request
+      command: "curl -s http://{{ansible_default_ipv4.address}}"
+      register: curl_output
+
+    - name: Display HTTP response
+      debug:
+        var: curl_output.stdout
+
+    - name: Send HTTP request
+      command: "curl -s http://{{ansible_default_ipv4.address}}"
+      register: curl_output
+
+    - name: Display HTTP response
+      debug:
+        var: curl_output.stdout
+        
+    - name: Send HTTP request
+      command: "curl -s http://{{ansible_default_ipv4.address}}"
+      register: curl_output
+
+    - name: Display HTTP response
+      debug:
+        var: curl_output.stdout
+    
+
+
+    
+
+    
+

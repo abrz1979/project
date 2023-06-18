@@ -1,0 +1,19 @@
+frontend http80
+    bind *:80
+    timeout client 10000ms
+    mode http
+    default_backend backend_servers
+
+backend backend_servers
+    balance {{ algorithm }}
+    mode http
+    timeout connect 10000ms
+    timeout server 300000ms
+    retries 3
+    maxconn 50000
+    timeout queue 40000
+    option httpchk
+{%  for server in groups['dev'] %}
+    server {{ hostvars[server]['inventory_hostname'] }} {{ hostvars[server]['ansible_default_ipv4']['address']}}:80
+{% endfor %}
+

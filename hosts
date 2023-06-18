@@ -1,0 +1,9 @@
+[dev]
+test_deva 
+test_devb 
+test_devc 
+[haproxy]
+test_proxy 
+[all:vars]
+ansible_user=ubuntu
+
