@@ -1,9 +1,10 @@
+
 [dev]
-test_deva 
-test_devb 
-test_devc 
+pori_deva
+pori_devb
+pori_devc
 [haproxy]
-test_proxy 
+pori_proxy
+
 [all:vars]
 ansible_user=ubuntu
-

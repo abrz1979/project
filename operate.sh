@@ -163,15 +163,15 @@ echo "$remote_output"
 
 # Install telegraf on the server
 echo "Install Telegraf and influxdb"
-ssh -o StrictHostKeyChecking=no -i id_rsa.pub ubuntu@$floating_ip_bastion 'sudo apt update >/dev/null 2>&1 && sudo apt install -y telegraf >/dev/null 2>&1'
-ssh -o StrictHostKeyChecking=no -i id_rsa.pub ubuntu@$floating_ip_bastion 'sudo apt install -y influxdb >/dev/null 2>&1'
-ssh -o StrictHostKeyChecking=no -i id_rsa.pub ubuntu@$floating_ip_bastion 'sudo apt install -y influxdb-client >/dev/null 2>&1'
+ssh -o StrictHostKeyChecking=no -i id_rsa ubuntu@$floating_ip_bastion 'sudo apt update >/dev/null 2>&1 && sudo apt install -y telegraf >/dev/null 2>&1'
+ssh -o StrictHostKeyChecking=no -i id_rsa ubuntu@$floating_ip_bastion 'sudo apt install -y influxdb >/dev/null 2>&1'
+ssh -o StrictHostKeyChecking=no -i id_rsa ubuntu@$floating_ip_bastion 'sudo apt install -y influxdb-client >/dev/null 2>&1'
 
 
 
 
 # Stop the telegraf service
-ssh -o StrictHostKeyChecking=no -i id_rsa.pub ubuntu@$floating_ip_bastion 'sudo systemctl stop telegraf >/dev/null 2>&1'
+ssh -o StrictHostKeyChecking=no -i id_rsa ubuntu@$floating_ip_bastion 'sudo systemctl stop telegraf >/dev/null 2>&1'
 # Replace the configuration file with the temporary file
 
 scp  -o BatchMode=yes  telegraf.conf.tmp ubuntu@$floating_ip_bastion:~/.ssh

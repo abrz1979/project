@@ -45,6 +45,22 @@ security_group="default"
 # Source the openrc file
 source "$openrc_file"
 
+cat <<EOF >hosts
+
+EOF
+cat <<EOF >>hosts
+[dev]
+${tag}_deva
+${tag}_devb
+${tag}_devc
+[haproxy]
+${tag}_proxy
+
+[all:vars]
+ansible_user=ubuntu
+EOF
+
+#read -p "waiiit"
 # Find the external network
 external_net=$(openstack network list --external --format value -c ID)
 if [ -z "$external_net" ]; then
@@ -286,25 +302,27 @@ echo "Base SSH configuration file created: $ssh_config_file"
 
 # Install Ansible on the server
 echo "Install ansible"
-ssh -o StrictHostKeyChecking=no -i id_rsa ubuntu@$floating_ip_bastion 'sudo apt update >/dev/null 2>&1 && sudo apt install -y ansible >/dev/null 2>&1'
+ssh -o StrictHostKeyChecking=no -i id_rsa.pub ubuntu@$floating_ip_bastion 'sudo apt update >/dev/null 2>&1 && sudo apt install -y ansible >/dev/null 2>&1'
 # Check the Ansible version on the server
-ansible_version=$(ssh -i id_rsa.pub ubuntu@$floating_ip_bastion 'ansible --version')
+#ansible_version=$(ssh -i id_rsa.pub ubuntu@$floating_ip_bastion 'ansible --version')
 echo "Ansible installed successfully"
-echo "Ansible version: $ansible_version"
+#echo "Ansible version: $ansible_version"
 
 # Copy the public key to the Bastion server
 echo "Copying public key to the Bastion server"
 #scp  -o StrictHostKeyChecking=no id_rsa.pub ubuntu@$floating_ip_bastion:~/.ssh
 scp  -o BatchMode=yes id_rsa ubuntu@$floating_ip_bastion:~/.ssh
 scp  -o BatchMode=yes  $ssh_config_file ubuntu@$floating_ip_bastion:~/.ssh
-scp  -o BatchMode=yes  site.yaml ubuntu@$floating_ip_bastion:~/.ssh
+#scp  -o BatchMode=yes  -r ansible ubuntu@$floating_ip_bastion:~/.ssh
 scp  -o BatchMode=yes  application2.py ubuntu@$floating_ip_bastion:~/.ssh
 scp  -o BatchMode=yes  haproxy.cfg.j2 ubuntu@$floating_ip_bastion:~/.ssh
-scp  -o BatchMode=yes  my_flask_app.service ubuntu@$floating_ip_bastion:~/.ssh	
 scp  -o BatchMode=yes  hosts ubuntu@$floating_ip_bastion:~/.ssh
+scp  -o BatchMode=yes  my_flask_app.service ubuntu@$floating_ip_bastion:~/.ssh
+scp  -o BatchMode=yes  site.yaml ubuntu@$floating_ip_bastion:~/.ssh
+scp  -o BatchMode=yes  config ubuntu@$floating_ip_bastion:~/.ssh
 
 
-ssh -i id_rsa.pub ubuntu@$floating_ip_bastion "ansible-playbook -i ~/.ssh/ansible/hosts ~/.ssh/ansible/site.yaml "
+ssh -i id_rsa.pub ubuntu@$floating_ip_bastion "ansible-playbook -i ~/.ssh/hosts ~/.ssh/site.yaml "
 
 
 
