@@ -1,6 +1,6 @@
 #!/bin/bash
 
-while true; do
+
 
 # Check if the openrc file path, tag, and public key are provided as command-line arguments
 if [ -z "$1" ] || [ -z "$2" ] || [ -z "$3" ]; then
@@ -73,8 +73,21 @@ if [ -z "$external_net" ]; then
     exit 1
 fi
 
-#!/bin/bash
+floating_ips=$(openstack floating ip list -f value -c "Floating IP Address" )
+floating_ip_bastion=$(echo "$floating_ips" | awk 'NR==1')
+echo "floating_ip_bastion $floating_ip_bastion"
+floating_ip_proxy=$(echo "$floating_ips" | awk 'NR==2')
+echo "floating_ip_proxy $floating_ip_proxy"
 
+# Install telegraf on the server
+echo "Install Telegraf and influxdb"
+ssh -o StrictHostKeyChecking=no -i $public_key ubuntu@$floating_ip_bastion 'sudo apt update >/dev/null 2>&1 && sudo apt install -y telegraf >/dev/null 2>&1'
+ssh -o StrictHostKeyChecking=no -i $public_key ubuntu@$floating_ip_bastion 'sudo apt install -y influxdb >/dev/null 2>&1'
+ssh -o StrictHostKeyChecking=no -i $public_key ubuntu@$floating_ip_bastion 'sudo apt install -y influxdb-client >/dev/null 2>&1'
+sleep 10s
+
+
+while true; do
 # Fetch the server list from OpenStack
 server_list=$(openstack server list -c Name -f value)
 
@@ -90,7 +103,13 @@ while read -r server_name; do
   ip_list["$server_name"]=$bastion_ip
 done <<< "$server_list"
 
+
+
 # Generate the telegraf.conf.tmp file
+cat <<EOF >telegraf.conf.tmp
+
+EOF
+
 cat <<EOF > telegraf.conf.tmp
 [agent]
   interval = "1s"
@@ -105,6 +124,7 @@ cat <<EOF > telegraf.conf.tmp
   urls = [
 EOF
 
+
 # Iterate over the IP list and append server IPs (containing "dev") to the urls section
 for server_name in "${!ip_list[@]}"; do
   if [[ "$server_name" == *"dev"* ]]; then
@@ -113,6 +133,7 @@ for server_name in "${!ip_list[@]}"; do
   fi
 done
 
+
 # Complete the telegraf.conf.tmp file
 echo "  ]" >> telegraf.conf.tmp
 echo "EOF"
@@ -120,11 +141,7 @@ echo "EOF"
 echo "telegraf.conf.tmp file created successfully."
 
 
-floating_ips=$(openstack floating ip list -f value -c "Floating IP Address" )
-floating_ip_bastion=$(echo "$floating_ips" | awk 'NR==1')
-echo "floating_ip_bastion $floating_ip_bastion"
-floating_ip_proxy=$(echo "$floating_ips" | awk 'NR==2')
-echo "floating_ip_proxy $floating_ip_proxy"
+
 
 
 # Get the number of servers in OpenStack
@@ -168,11 +185,7 @@ echo "active-server file has been created successfully."
 
 
 
-# Install telegraf on the server
-echo "Install Telegraf and influxdb"
-ssh -o StrictHostKeyChecking=no -i $public_key ubuntu@$floating_ip_bastion 'sudo apt update >/dev/null 2>&1 && sudo apt install -y telegraf >/dev/null 2>&1'
-ssh -o StrictHostKeyChecking=no -i $public_key ubuntu@$floating_ip_bastion 'sudo apt install -y influxdb >/dev/null 2>&1'
-ssh -o StrictHostKeyChecking=no -i $public_key ubuntu@$floating_ip_bastion 'sudo apt install -y influxdb-client >/dev/null 2>&1'
+
 
 
 
@@ -279,7 +292,7 @@ Host $server_name
   HostName $server_ip
   User ubuntu
   StrictHostKeyChecking no
-  IdentityFile ~/.ssh/id_rsa
+  IdentityFile ~/.ssh/$private_key
 
 EOF
   elif [[ "$server_name" == *"proxy"* ]]; then
@@ -293,7 +306,7 @@ Host $server_name
   HostName $server_ip
   User ubuntu
   StrictHostKeyChecking no
-  IdentityFile ~/.ssh/id_rsa
+  IdentityFile ~/.ssh/$private_key
 
 EOF
   fi
