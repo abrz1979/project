@@ -13,7 +13,9 @@ openrc_file="$1"
 tag="$2"
 
 # Set the public key
-public_key="$3"
+private_key="$3"
+
+public_key="public_key.pub"
 
 # Set the network name with the tag
 network_name="${tag}_network"
@@ -41,6 +43,10 @@ flavor="1C-1GB"
 
 # Set the security group
 security_group="default"
+echo "create publickey"
+# Generate public key file from private key
+ssh-keygen -y -f "$private_key" > "$public_key"
+echo "create publickey"
 
 # Source the openrc file
 source "$openrc_file"
@@ -271,7 +277,7 @@ echo "Host ${tag}_deva" >> "$ssh_config_file"
 echo "  HostName $deva_ip" >> "$ssh_config_file"
 echo "  User ubuntu" >> "$ssh_config_file"
 echo " StrictHostKeyChecking no" >> "$ssh_config_file"
-echo "  IdentityFile ~/.ssh/id_rsa" >> "$ssh_config_file"
+echo "  IdentityFile ~/.ssh/$private_key" >> "$ssh_config_file"
 echo "" >> "$ssh_config_file"
 
 echo "# SSH configuration for ${tag}_devb" >> "$ssh_config_file"
@@ -279,7 +285,7 @@ echo "Host ${tag}_devb" >> "$ssh_config_file"
 echo "  HostName $devb_ip" >> "$ssh_config_file"
 echo "  User ubuntu" >> "$ssh_config_file"
 echo " StrictHostKeyChecking no" >> "$ssh_config_file"
-echo "  IdentityFile ~/.ssh/id_rsa" >> "$ssh_config_file"
+echo "  IdentityFile ~/.ssh/$private_key" >> "$ssh_config_file"
 echo "" >> "$ssh_config_file"
 
 echo "# SSH configuration for ${tag}_devc" >> "$ssh_config_file"
@@ -287,7 +293,7 @@ echo "Host ${tag}_devc" >> "$ssh_config_file"
 echo "  HostName $devc_ip" >> "$ssh_config_file"
 echo "  User ubuntu" >> "$ssh_config_file"
 echo " StrictHostKeyChecking no" >> "$ssh_config_file"
-echo "  IdentityFile ~/.ssh/id_rsa" >> "$ssh_config_file"
+echo "  IdentityFile ~/.ssh/$private_key" >> "$ssh_config_file"
 echo "" >> "$ssh_config_file"
 
 echo "# SSH configuration for ${tag}_proxy" >> "$ssh_config_file"
@@ -295,14 +301,14 @@ echo "Host ${tag}_proxy" >> "$ssh_config_file"
 echo "  HostName $proxy_ip" >> "$ssh_config_file"
 echo "  User ubuntu" >> "$ssh_config_file"
 echo " StrictHostKeyChecking no" >> "$ssh_config_file"
-echo "  IdentityFile ~/.ssh/id_rsa" >> "$ssh_config_file"
+echo "  IdentityFile ~/.ssh/$private_key" >> "$ssh_config_file"
 
 echo "Base SSH configuration file created: $ssh_config_file"
 
 
 # Install Ansible on the server
 echo "Install ansible"
-ssh -o StrictHostKeyChecking=no -i id_rsa.pub ubuntu@$floating_ip_bastion 'sudo apt update >/dev/null 2>&1 && sudo apt install -y ansible >/dev/null 2>&1'
+ssh -o StrictHostKeyChecking=no -i $public_key ubuntu@$floating_ip_bastion 'sudo apt update >/dev/null 2>&1 && sudo apt install -y ansible >/dev/null 2>&1'
 # Check the Ansible version on the server
 #ansible_version=$(ssh -i id_rsa.pub ubuntu@$floating_ip_bastion 'ansible --version')
 echo "Ansible installed successfully"
@@ -310,8 +316,8 @@ echo "Ansible installed successfully"
 
 # Copy the public key to the Bastion server
 echo "Copying public key to the Bastion server"
-#scp  -o StrictHostKeyChecking=no id_rsa.pub ubuntu@$floating_ip_bastion:~/.ssh
-scp  -o BatchMode=yes id_rsa ubuntu@$floating_ip_bastion:~/.ssh
+scp  -o StrictHostKeyChecking=no $public_key ubuntu@$floating_ip_bastion:~/.ssh
+scp  -o BatchMode=yes $private_key ubuntu@$floating_ip_bastion:~/.ssh
 scp  -o BatchMode=yes  $ssh_config_file ubuntu@$floating_ip_bastion:~/.ssh
 #scp  -o BatchMode=yes  -r ansible ubuntu@$floating_ip_bastion:~/.ssh
 scp  -o BatchMode=yes  application2.py ubuntu@$floating_ip_bastion:~/.ssh
@@ -322,7 +328,7 @@ scp  -o BatchMode=yes  site.yaml ubuntu@$floating_ip_bastion:~/.ssh
 scp  -o BatchMode=yes  config ubuntu@$floating_ip_bastion:~/.ssh
 
 
-ssh -i id_rsa.pub ubuntu@$floating_ip_bastion "ansible-playbook -i ~/.ssh/hosts ~/.ssh/site.yaml "
+ssh -i $public_key ubuntu@$floating_ip_bastion "ansible-playbook -i ~/.ssh/hosts ~/.ssh/site.yaml "
 
 
 

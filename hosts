@@ -1,9 +1,11 @@
-
 [dev]
-pori_deva
+
+pori_dev_6617
 pori_devb
-pori_devc
+pori_deva
+
 [haproxy]
+
 pori_proxy
 
 [all:vars]

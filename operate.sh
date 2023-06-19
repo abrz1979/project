@@ -15,7 +15,9 @@ openrc_file="$1"
 tag="$2"
 
 # Set the public key
-public_key="$3"
+private_key="$3"
+
+public_key="public_key.pub"
 
 # Set the network name with the tag
 network_name="${tag}_network"
@@ -47,6 +49,11 @@ security_group="default"
 # Source the openrc file
 source "$openrc_file"
 
+ssh-keygen -y -f "$private_key" > "$public_key"
+
+
+
+#read -p "waitttt "
 # Find the image ID for Ubuntu 20.04
     image=$(openstack image list --format value | grep "$image_name")
 
@@ -156,38 +163,38 @@ EOF
 chmod 777 active-server.sh
 
 echo "active-server file has been created successfully."
-remote_output=$(ssh -o StrictHostKeyChecking=no -i id_rsa.pub ubuntu@$floating_ip_bastion "bash -s" < active-server.sh)
-echo "$remote_output"
+#remote_output=$(ssh -o StrictHostKeyChecking=no -i id_rsa.pub ubuntu@$floating_ip_bastion "bash -s" < active-server.sh)
+#echo "$remote_output"
 
 
 
 # Install telegraf on the server
 echo "Install Telegraf and influxdb"
-ssh -o StrictHostKeyChecking=no -i id_rsa ubuntu@$floating_ip_bastion 'sudo apt update >/dev/null 2>&1 && sudo apt install -y telegraf >/dev/null 2>&1'
-ssh -o StrictHostKeyChecking=no -i id_rsa ubuntu@$floating_ip_bastion 'sudo apt install -y influxdb >/dev/null 2>&1'
-ssh -o StrictHostKeyChecking=no -i id_rsa ubuntu@$floating_ip_bastion 'sudo apt install -y influxdb-client >/dev/null 2>&1'
+ssh -o StrictHostKeyChecking=no -i $public_key ubuntu@$floating_ip_bastion 'sudo apt update >/dev/null 2>&1 && sudo apt install -y telegraf >/dev/null 2>&1'
+ssh -o StrictHostKeyChecking=no -i $public_key ubuntu@$floating_ip_bastion 'sudo apt install -y influxdb >/dev/null 2>&1'
+ssh -o StrictHostKeyChecking=no -i $public_key ubuntu@$floating_ip_bastion 'sudo apt install -y influxdb-client >/dev/null 2>&1'
 
 
 
 
 # Stop the telegraf service
-ssh -o StrictHostKeyChecking=no -i id_rsa ubuntu@$floating_ip_bastion 'sudo systemctl stop telegraf >/dev/null 2>&1'
+ssh -o StrictHostKeyChecking=no -i $public_key ubuntu@$floating_ip_bastion 'sudo systemctl stop telegraf >/dev/null 2>&1'
 # Replace the configuration file with the temporary file
 
 scp  -o BatchMode=yes  telegraf.conf.tmp ubuntu@$floating_ip_bastion:~/.ssh
 # Replace the configuration file with the temporary file
-ssh -o StrictHostKeyChecking=no -i id_rsa.pub ubuntu@$floating_ip_bastion 'sudo cp ~/.ssh/telegraf.conf.tmp /etc/telegraf/telegraf.conf'
+ssh -o StrictHostKeyChecking=no -i $public_key ubuntu@$floating_ip_bastion 'sudo cp ~/.ssh/telegraf.conf.tmp /etc/telegraf/telegraf.conf'
 
 
 # Start the telegraf service
-ssh -o StrictHostKeyChecking=no -i id_rsa.pub ubuntu@$floating_ip_bastion 'sudo systemctl start telegraf >/dev/null 2>&1'
-ssh -o StrictHostKeyChecking=no -i id_rsa.pub ubuntu@$floating_ip_bastion 'sudo systemctl status telegraf '
+ssh -o StrictHostKeyChecking=no -i $public_key ubuntu@$floating_ip_bastion 'sudo systemctl start telegraf >/dev/null 2>&1'
+#ssh -o StrictHostKeyChecking=no -i id_rsa.pub ubuntu@$floating_ip_bastion 'sudo systemctl status telegraf '
 
 
 
 # Execute the InfluxDB command and capture the output
 #remote_output=(ssh -o StrictHostKeyChecking=no -i id_rsa.pub ubuntu@$floating_ip_bastion  < monitor.sh) 
-remote_output=$(ssh -o StrictHostKeyChecking=no -i id_rsa.pub ubuntu@$floating_ip_bastion "bash -s" < active-server.sh)
+remote_output=$(ssh -o StrictHostKeyChecking=no -i $public_key ubuntu@$floating_ip_bastion "bash -s" < active-server.sh)
 echo "$remote_output"
 
 active_hosts_remote=$(echo "$remote_output" | awk '/Number of active hosts:/ {print $NF}')
@@ -196,22 +203,31 @@ echo "Active hosts on the remote server: $active_hosts_remote"
 
 
 # Local number of active hosts
-local_active_hosts=$(cat number.txt)
+local_active_hosts=$(cat server.conf)
 echo " config num is $local_active_hosts"
 
 # Compare local_active_hosts with active_hosts_remote
 if [ "$local_active_hosts" -gt "$active_hosts_remote" ]; then
     echo "Number of active hosts on the local server ($local_active_hosts) is greater than active_hosts_remote ($active_hosts_remote). Creating a new server."
 
-    # Generate a random number for the server name
-    random_number=$(shuf -i 1000-9999 -n 1)
-    server_name="${tag}_dev_${random_number}"
+    # Calculate the difference between local_active_hosts and active_hosts_remote
+difference=$((local_active_hosts - active_hosts_remote))
 
-    # Create the new server instance with the same configuration as the previous servers
-    openstack server create --flavor "$flavor" --image "$image_id" --network "$network_name" \
-        --security-group "$security_group" --key-name "$key_name" "$server_name"
 
-    echo "New server created with the name '$server_name'"
+
+    for ((i=1; i<=$difference; i++)); do
+        # Generate a random number for the server name
+        random_number=$(shuf -i 1000-9999 -n 1)
+        server_name="${tag}_dev_${random_number}"
+
+        # Create the new server instance with the same configuration as the previous servers
+        openstack server create --flavor "$flavor" --image "$image_id" --network "$network_name" \
+            --security-group "$security_group" --key-name "$key_name" "$server_name"
+
+        echo "New server created with the name '$server_name'"
+    done
+
+
 #=============================================================== 
      # Fetch the server list from OpenStack
 server_list=$(openstack server list -c Name -f value)
@@ -234,7 +250,7 @@ cat <<EOF >>hosts
 
 [haproxy]
 
-test_proxy
+${tag}_proxy
 
 [all:vars]
 ansible_user=ubuntu
@@ -288,11 +304,11 @@ echo "The 'ssh_config' file has been created successfully."
  # Copy the Host and config to the Bastion server
 echo "Copying config ssh and host to the Bastion server"
 scp  -o StrictHostKeyChecking=no config ubuntu@$floating_ip_bastion:~/.ssh
-scp  -o BatchMode=yes hosts ubuntu@$floating_ip_bastion:~/.ssh/ansible
+scp  -o BatchMode=yes hosts ubuntu@$floating_ip_bastion:~/.ssh/
 
 sleep 5s
 #read -p  "Enter wait.."
-ssh -i id_rsa.pub ubuntu@$floating_ip_bastion "ansible-playbook -i ~/.ssh/ansible/hosts ~/.ssh/ansible/site.yaml "
+ssh -i $public_key ubuntu@$floating_ip_bastion "ansible-playbook -i ~/.ssh/hosts ~/.ssh/site.yaml "
 
 
 #================================================================================================== Delete
@@ -309,6 +325,10 @@ if [[ -z $server_list ]]; then
   exit 0
 fi
 
+difference=$((active_hosts_remote-local_active_hosts ))
+
+for ((i=1; i<=$difference; i++)); do
+
 # Extract server ID of the first server in the list
 server_id=$(echo "$server_list1" | head -n 1 | awk '{print $1}')
 
@@ -317,6 +337,7 @@ server_id=$(echo "$server_list1" | head -n 1 | awk '{print $1}')
 # Delete the first server
 openstack server delete "$server_id"
 echo "Deleting server: $server_id"
+done
 # Wait for the server to be deleted
 sleep 5s
 #read -p  "wait.."
@@ -344,7 +365,7 @@ cat <<EOF >>hosts
 
 [haproxy]
 
-test_proxy
+${tag}_proxy
 
 [all:vars]
 ansible_user=ubuntu
@@ -401,8 +422,8 @@ echo "The 'ssh_config' file has been created successfully."
  # Copy the Host and config to the Bastion server
 echo "Copying config ssh and host to the Bastion server"
 scp  -o StrictHostKeyChecking=no config ubuntu@$floating_ip_bastion:~/.ssh
-scp  -o BatchMode=yes hosts ubuntu@$floating_ip_bastion:~/.ssh/ansible
-ssh -i id_rsa.pub ubuntu@$floating_ip_bastion "ansible-playbook -i ~/.ssh/ansible/hosts ~/.ssh/ansible/site.yaml "
+scp  -o BatchMode=yes hosts ubuntu@$floating_ip_bastion:~/.ssh/
+ssh -i $public_key ubuntu@$floating_ip_bastion "ansible-playbook -i ~/.ssh/hosts ~/.ssh/site.yaml "
 
 
 
@@ -412,36 +433,7 @@ else
    echo "Number of active hosts on the local server ($local_active_hosts) is equal than active_hosts_remote ($active_hosts_remote). No new server will be created."
  
  
- # Fetch the server list from OpenStack
-server_list=$(openstack server list -c Name -f value)
-
-# Create the hosts file
-cat <<EOF >hosts
-[dev]
-
-EOF
-
-# Add all OpenStack servers with "dev" in their names below the [dev] section
-while read -r server_name; do
-  if [[ "$server_name" == *"dev"* ]]; then
-    echo "$server_name" >>hosts
-  fi
-done <<< "$server_list"
-
-# Append the remaining sections to the hosts file
-cat <<EOF >>hosts
-
-[haproxy]
-
-test_proxy
-
-[all:vars]
-ansible_user=ubuntu
-EOF
-
-echo "The 'hosts' file has been created successfully."
-
-    
+   
 fi
 echo " Waiting for 30s..."
 sleep 30
