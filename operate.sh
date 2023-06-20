@@ -89,18 +89,29 @@ sleep 10s
 
 while true; do
 # Fetch the server list from OpenStack
+sleep 5s
 server_list=$(openstack server list -c Name -f value)
+echo "server list $server_list"
+
 
 # Declare an associative array to store server name and IP address pairs
 declare -A ip_list
+# Check if the array is empty
+if [ "${#ip_list[@]}" -eq 0 ]; then
+    echo "ip_list is empty"
+else
+    echo "ip_list is not empty"
+fi
+
+
 
 # Iterate over the server list and retrieve IP addresses
 while read -r server_name; do
   # Execute the command to retrieve the IP address
-  bastion_ip=$(openstack server show -f value -c addresses "$server_name" | grep -oE '[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+' | head -n 1)
+  ip=$(openstack server show -f value -c addresses "$server_name" | grep -oE '[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+' | head -n 1)
 
   # Store the server name and IP address pair in the array
-  ip_list["$server_name"]=$bastion_ip
+  ip_list["$server_name"]=$ip
 done <<< "$server_list"
 
 
@@ -133,6 +144,11 @@ for server_name in "${!ip_list[@]}"; do
   fi
 done
 
+# Print the contents of the ip_list array
+for server_name in "${!ip_list[@]}"; do
+  echo "Server: $server_name, IP: ${ip_list[$server_name]}"
+done
+
 
 # Complete the telegraf.conf.tmp file
 echo "  ]" >> telegraf.conf.tmp
@@ -140,8 +156,9 @@ echo "EOF"
 
 echo "telegraf.conf.tmp file created successfully."
 
+unset ip_list
 
-
+#read -p "wait.."
 
 
 # Get the number of servers in OpenStack
@@ -178,7 +195,7 @@ fi
 EOF
 # Change the permissions of the created file
 chmod 777 active-server.sh
-
+sleep 10s
 echo "active-server file has been created successfully."
 #remote_output=$(ssh -o StrictHostKeyChecking=no -i id_rsa.pub ubuntu@$floating_ip_bastion "bash -s" < active-server.sh)
 #echo "$remote_output"
@@ -203,7 +220,7 @@ ssh -o StrictHostKeyChecking=no -i $public_key ubuntu@$floating_ip_bastion 'sudo
 ssh -o StrictHostKeyChecking=no -i $public_key ubuntu@$floating_ip_bastion 'sudo systemctl start telegraf >/dev/null 2>&1'
 #ssh -o StrictHostKeyChecking=no -i id_rsa.pub ubuntu@$floating_ip_bastion 'sudo systemctl status telegraf '
 
-
+sleep 10s
 
 # Execute the InfluxDB command and capture the output
 #remote_output=(ssh -o StrictHostKeyChecking=no -i id_rsa.pub ubuntu@$floating_ip_bastion  < monitor.sh) 
@@ -328,7 +345,13 @@ ssh -i $public_key ubuntu@$floating_ip_bastion "ansible-playbook -i ~/.ssh/hosts
  
 elif [ "$local_active_hosts" -lt "$active_hosts_remote" ]; then
     echo "Number of active hosts on the local server ($local_active_hosts) is less than active_hosts_remote ($active_hosts_remote).  new server will be deleted."
-    # Find servers containing "dev" in their names
+    
+
+difference=$((active_hosts_remote-local_active_hosts ))
+
+for ((i=1; i<=$difference; i++)); do
+sleep 10s
+# Find servers containing "dev" in their names
 server_list1=$(openstack server list  -c ID -c Name -f value | grep dev)
 echo " server list is $server_list1"
 
@@ -337,10 +360,6 @@ if [[ -z $server_list ]]; then
   echo "No dev servers found."
   exit 0
 fi
-
-difference=$((active_hosts_remote-local_active_hosts ))
-
-for ((i=1; i<=$difference; i++)); do
 
 # Extract server ID of the first server in the list
 server_id=$(echo "$server_list1" | head -n 1 | awk '{print $1}')
@@ -351,6 +370,8 @@ server_id=$(echo "$server_list1" | head -n 1 | awk '{print $1}')
 openstack server delete "$server_id"
 echo "Deleting server: $server_id"
 done
+
+
 # Wait for the server to be deleted
 sleep 5s
 #read -p  "wait.."
