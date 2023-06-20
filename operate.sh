@@ -220,7 +220,7 @@ ssh -o StrictHostKeyChecking=no -i $public_key ubuntu@$floating_ip_bastion 'sudo
 ssh -o StrictHostKeyChecking=no -i $public_key ubuntu@$floating_ip_bastion 'sudo systemctl start telegraf >/dev/null 2>&1'
 #ssh -o StrictHostKeyChecking=no -i id_rsa.pub ubuntu@$floating_ip_bastion 'sudo systemctl status telegraf '
 
-sleep 10s
+sleep 5s
 
 # Execute the InfluxDB command and capture the output
 #remote_output=(ssh -o StrictHostKeyChecking=no -i id_rsa.pub ubuntu@$floating_ip_bastion  < monitor.sh) 
@@ -339,6 +339,13 @@ scp  -o BatchMode=yes hosts ubuntu@$floating_ip_bastion:~/.ssh/
 sleep 5s
 #read -p  "Enter wait.."
 ssh -i $public_key ubuntu@$floating_ip_bastion "ansible-playbook -i ~/.ssh/hosts ~/.ssh/site.yaml "
+
+for ((i=1; i<=$local_active_hosts; i++))
+do
+    echo "Request $i:"
+    curl http://$floating_ip_proxy
+    echo "================"
+done
 
 
 #================================================================================================== Delete
@@ -459,12 +466,24 @@ scp  -o StrictHostKeyChecking=no config ubuntu@$floating_ip_bastion:~/.ssh
 scp  -o BatchMode=yes hosts ubuntu@$floating_ip_bastion:~/.ssh/
 ssh -i $public_key ubuntu@$floating_ip_bastion "ansible-playbook -i ~/.ssh/hosts ~/.ssh/site.yaml "
 
+for ((i=1; i<=$local_active_hosts; i++))
+do
+    echo "Request $i:"
+    curl http://$floating_ip_proxy
+    echo "================"
+done
 
 
     
     
 else
    echo "Number of active hosts on the local server ($local_active_hosts) is equal than active_hosts_remote ($active_hosts_remote). No new server will be created."
+   for ((i=1; i<=$local_active_hosts ; i++))
+do
+    echo "Request $i:"
+    curl http://$floating_ip_proxy
+    echo "================"
+done
  
  
    

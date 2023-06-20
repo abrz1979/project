@@ -43,10 +43,10 @@ flavor="1C-1GB"
 
 # Set the security group
 security_group="default"
-echo "create publickey"
+echo "creating publickey"
 # Generate public key file from private key
 ssh-keygen -y -f "$private_key" > "$public_key"
-echo "create publickey"
+#echo "create publickey"
 
 # Source the openrc file
 source "$openrc_file"
@@ -329,6 +329,13 @@ scp  -o BatchMode=yes  config ubuntu@$floating_ip_bastion:~/.ssh
 
 
 ssh -i $public_key ubuntu@$floating_ip_bastion "ansible-playbook -i ~/.ssh/hosts ~/.ssh/site.yaml "
+
+for ((i=1; i<=3; i++))
+do
+    echo "Request $i:"
+    curl http://$floating_ip_proxy
+    echo "================"
+done
 
 
 

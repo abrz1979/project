@@ -154,3 +154,5 @@ if [ -z "$remaining_networks" ]; then
   echo "No networks found with tag '$tag'."
 fi
 
+echo "All components have been removed "
+
