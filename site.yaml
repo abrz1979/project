@@ -55,7 +55,47 @@
       ansible.builtin.shell:
         cmd: "systemctl restart my_flask_app "
         
+    - name: Install SNMP daemon on Service Nodes
+      become: true
+      apt:
+        name: snmpd
+        state: present
 
+    - name: Install snmp-mibs-downloader
+      become: true
+      apt:
+        name: snmp-mibs-downloader
+        state: present
+
+    - name: copy snmpd.conf file
+      copy:
+        src="./snmpd.conf"
+        dest="/etc/snmp/snmpd.conf"
+
+    - name: restarting snmpd
+      service:
+        name: snmpd
+        state: restarted
+        enabled: yes
+
+- name: Install InfluxDB, Telegraf, and InfluxDB client on Ubuntu
+  hosts: bastion
+  become: true
+  tasks:
+    - name: Install InfluxDB, Telegraf, and InfluxDB client
+      apt:
+        name: "{{ item }}"
+        state: present
+        update_cache: yes
+      loop:
+        - influxdb
+        - telegraf
+        - influxdb-client
+        
+
+
+
+        
       
 
 - hosts: haproxy
