@@ -15,9 +15,8 @@ openrc_file="$1"
 tag="$2"
 
 # Set the public key
-private_key="$3"
-
-public_key="public_key.pub"
+public_key="$3"
+private_key="${public_key%.pub}"
 
 # Set the network name with the tag
 network_name="${tag}_network"
@@ -38,80 +37,97 @@ server_name="${tag}_bastion"
 proxy_server_name="${tag}_proxy"
 
 # Set the image name
-image_name="Ubuntu 22.04.1"
+image_name="Ubuntu 22.04"
 
 # Set the flavor
-flavor="1C-1GB"
+flavor="1C-2GB"
 
 # Set the security group
-security_group="default"
+# security_group="default"
+security_group="${tag}_securitygroup"
 
 # Source the openrc file
 source "$openrc_file"
 
-ssh-keygen -y -f "$private_key" > "$public_key"
+current_date=$(date +"%Y-%m-%d")
 
 
+start_time=$(date +%s)
 
-#read -p "waitttt "
+#ssh-keygen -y -f "$private_key" > "$public_key"
+
+current_time=$(date +"%H:%M:%S")
+
+echo -e "$current_date $current_time Operation is in progress... \n "
+current_time=$(date +"%H:%M:%S")
+echo "$current_date $current_time Detecting suitable image, looking for Ubuntu $image_name"
+
 # Find the image ID for Ubuntu 20.04
-    image=$(openstack image list --format value | grep "$image_name")
+    image=$(openstack image list --status active --format value | grep "$image_name")
 
     # Check if image is empty
     if [[ -z "$image" ]]; then
-        echo "Image not found: $image_name"
+        echo "$current_date $current_time Image not found: $image_name"
     else
-        image_id=$(echo "$image" | awk '{print $1}')
-        echo "Image found: $image"
-        echo "Image ID: $image_id"
+        image_id=$(echo "$image" | awk 'NR==1{print $1}')
+#        echo  -e "$current_date $current_time Image found:\n $image  "
+        echo -e "$current_date $current_time Image ID: $image_id  "
     fi
 
 # Find the external network
+current_time=$(date +"%H:%M:%S")
 external_net=$(openstack network list --external --format value -c ID)
 if [ -z "$external_net" ]; then
-    echo "No external network found. Exiting."
+    echo "$current_date $current_time No external network found. Exiting."
     exit 1
 fi
-
+current_time=$(date +"%H:%M:%S")
 floating_ips=$(openstack floating ip list -f value -c "Floating IP Address" )
 floating_ip_bastion=$(echo "$floating_ips" | awk 'NR==1')
-echo "floating_ip_bastion $floating_ip_bastion"
+echo "$current_date $current_time Floating_ip_bastion $floating_ip_bastion"
 floating_ip_proxy=$(echo "$floating_ips" | awk 'NR==2')
-echo "floating_ip_proxy $floating_ip_proxy"
+echo "$current_date $current_time Floating_ip_proxy $floating_ip_proxy"
 
 # Install telegraf on the server
-echo "Install Telegraf and influxdb"
-ssh -o StrictHostKeyChecking=no -i $public_key ubuntu@$floating_ip_bastion 'sudo apt update >/dev/null 2>&1 && sudo apt install -y telegraf >/dev/null 2>&1'
-ssh -o StrictHostKeyChecking=no -i $public_key ubuntu@$floating_ip_bastion 'sudo apt install -y influxdb >/dev/null 2>&1'
-ssh -o StrictHostKeyChecking=no -i $public_key ubuntu@$floating_ip_bastion 'sudo apt install -y influxdb-client >/dev/null 2>&1'
-sleep 10s
+#echo "Install Telegraf and influxdb"
+#ssh -o StrictHostKeyChecking=no -i $public_key ubuntu@$floating_ip_bastion 'sudo apt update >/dev/null 2>&1 && sudo apt install -y telegraf >/dev/null 2>&1'
+#ssh -o StrictHostKeyChecking=no -i $public_key ubuntu@$floating_ip_bastion 'sudo apt install -y influxdb >/dev/null 2>&1'
+#ssh -o StrictHostKeyChecking=no -i $public_key ubuntu@$floating_ip_bastion 'sudo apt install -y influxdb-client >/dev/null 2>&1'
+#sleep 10s
 
 
 while true; do
 # Fetch the server list from OpenStack
 sleep 5s
 server_list=$(openstack server list -c Name -f value)
-echo "server list $server_list"
+#echo "server list $server_list"
 
 
 # Declare an associative array to store server name and IP address pairs
 declare -A ip_list
 # Check if the array is empty
-if [ "${#ip_list[@]}" -eq 0 ]; then
-    echo "ip_list is empty"
-else
-    echo "ip_list is not empty"
-fi
+#if [ "${#ip_list[@]}" -eq 0 ]; then
+    #echo "ip_list is empty"
+#else
+    #echo "ip_list is not empty"
+#fi
 
 
 
 # Iterate over the server list and retrieve IP addresses
 while read -r server_name; do
+   # Execute the command to retrieve the power state
+  power_state=$(openstack server show -f value -c OS-EXT-STS:power_state "$server_name")
+  
+  
+  if [[ "$power_state" == "1" ]]; then
   # Execute the command to retrieve the IP address
   ip=$(openstack server show -f value -c addresses "$server_name" | grep -oE '[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+' | head -n 1)
 
   # Store the server name and IP address pair in the array
   ip_list["$server_name"]=$ip
+  
+  fi
 done <<< "$server_list"
 
 
@@ -143,26 +159,26 @@ for server_name in "${!ip_list[@]}"; do
     echo "    \"$ip_address\"," >> telegraf.conf.tmp
   fi
 done
-
+current_time=$(date +"%H:%M:%S")
 # Print the contents of the ip_list array
 for server_name in "${!ip_list[@]}"; do
-  echo "Server: $server_name, IP: ${ip_list[$server_name]}"
+  echo "$current_date $current_time $server_name, IP: ${ip_list[$server_name]}"
 done
 
 
 # Complete the telegraf.conf.tmp file
-echo "  ]" >> telegraf.conf.tmp
-echo "EOF"
+echo "  ]" >> telegraf.conf.tmp 
+echo "EOF" 
 
-echo "telegraf.conf.tmp file created successfully."
+#echo "$current_date $current_time telegraf.conf.tmp file created successfully."
 
 unset ip_list
 
-#read -p "wait.."
+
 
 
 # Get the number of servers in OpenStack
-server_num=$(openstack server list -c ID -c Name -f value | grep dev | wc -l)
+server_num=$(openstack server list --status ACTIVE -c ID -c Name -f value | grep dev | wc -l)
 
 # Create the config file
 cat <<EOF > active-server.sh
@@ -196,7 +212,7 @@ EOF
 # Change the permissions of the created file
 chmod 777 active-server.sh
 sleep 10s
-echo "active-server file has been created successfully."
+#echo "$current_date $current_time active-server file has been created successfully."
 #remote_output=$(ssh -o StrictHostKeyChecking=no -i id_rsa.pub ubuntu@$floating_ip_bastion "bash -s" < active-server.sh)
 #echo "$remote_output"
 
@@ -226,19 +242,23 @@ sleep 5s
 #remote_output=(ssh -o StrictHostKeyChecking=no -i id_rsa.pub ubuntu@$floating_ip_bastion  < monitor.sh) 
 remote_output=$(ssh -o StrictHostKeyChecking=no -i $public_key ubuntu@$floating_ip_bastion "bash -s" < active-server.sh)
 echo "$remote_output"
-
+current_time=$(date +"%H:%M:%S")
 active_hosts_remote=$(echo "$remote_output" | awk '/Number of active hosts:/ {print $NF}')
 
-echo "Active hosts on the remote server: $active_hosts_remote"
+echo "$current_date $current_time Active hosts on the remote server: $active_hosts_remote"
 
 
 # Local number of active hosts
-local_active_hosts=$(cat server.conf)
-echo " config num is $local_active_hosts"
+#local_active_hosts=$(cat server.conf)
 
+local_active_hosts=$(cat server.conf | grep -oE '[0-9]+')
+#echo "$current_date $current_time config num is $local_active_hosts"
+
+#echo " config num is $local_active_hosts"
+current_time=$(date +"%H:%M:%S")
 # Compare local_active_hosts with active_hosts_remote
 if [ "$local_active_hosts" -gt "$active_hosts_remote" ]; then
-    echo "Number of active hosts on the local server ($local_active_hosts) is greater than active_hosts_remote ($active_hosts_remote). Creating a new server."
+    echo "$current_date $current_time Number of active hosts on the local server ($local_active_hosts) is greater than active_hosts_remote ($active_hosts_remote). Creating a new server."
 
     # Calculate the difference between local_active_hosts and active_hosts_remote
 difference=$((local_active_hosts - active_hosts_remote))
@@ -249,18 +269,26 @@ difference=$((local_active_hosts - active_hosts_remote))
         # Generate a random number for the server name
         random_number=$(shuf -i 1000-9999 -n 1)
         server_name="${tag}_dev_${random_number}"
+        
+        
+        
+        while openstack server show "$server_name" >/dev/null 2>&1; do
+        echo "Server already exist.Creating another random number ..... "
+        # If a server with the same name already exists, generate a new name
+        server_name="${tag}_dev_$(shuf -i 1000-9999 -n 1)"
+       done
 
         # Create the new server instance with the same configuration as the previous servers
         openstack server create --flavor "$flavor" --image "$image_id" --network "$network_name" \
-            --security-group "$security_group" --key-name "$key_name" "$server_name"
-
-        echo "New server created with the name '$server_name'"
+            --security-group "$security_group" --key-name "$key_name" "$server_name"  
+current_time=$(date +"%H:%M:%S")
+        echo "$current_date $current_time New server created with the name '$server_name'"
     done
 
 
 #=============================================================== 
      # Fetch the server list from OpenStack
-server_list=$(openstack server list -c Name -f value)
+server_list=$(openstack server list --status ACTIVE -c Name -f value)
 
 # Create the hosts file
 cat <<EOF >hosts
@@ -282,11 +310,12 @@ cat <<EOF >>hosts
 
 ${tag}_proxy
 
+
 [all:vars]
 ansible_user=ubuntu
 EOF
-
-echo "The 'hosts' file has been created successfully." 
+current_time=$(date +"%H:%M:%S")
+echo "$current_date $current_time The 'hosts' file has been created successfully." 
 #======================================================================
 # Fetch the server list from OpenStack
 server_list=$(openstack server list -c Name -c Networks -f value)
@@ -300,7 +329,7 @@ EOF
 while read -r server_name server_networks; do
   if [[ "$server_name" == *"dev"* ]]; then
     # Extract the IP address from the server networks
-    server_ip=$(openstack server show -f value -c addresses "$server_name" | grep -oE '[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+' | head -n 1)
+    server_ip=$(openstack server show --status ACTIVE -f value -c addresses "$server_name" | grep -oE '[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+' | head -n 1)
 
     # Add the SSH configuration for the server
     cat <<EOF >>config
@@ -328,21 +357,21 @@ Host $server_name
 EOF
   fi
 done <<< "$server_list"
-
-echo "The 'ssh_config' file has been created successfully." 
- 
+current_time=$(date +"%H:%M:%S")
+echo "$current_date $current_time The 'ssh_config' file has been created successfully." 
+current_time=$(date +"%H:%M:%S")
  # Copy the Host and config to the Bastion server
-echo "Copying config ssh and host to the Bastion server"
-scp  -o StrictHostKeyChecking=no config ubuntu@$floating_ip_bastion:~/.ssh
-scp  -o BatchMode=yes hosts ubuntu@$floating_ip_bastion:~/.ssh/
+echo "$current_date $current_time Copying config ssh and host to the Bastion server"
+scp  -o StrictHostKeyChecking=no config ubuntu@$floating_ip_bastion:~/.ssh > /dev/null 2>&1
+scp  -o BatchMode=yes hosts ubuntu@$floating_ip_bastion:~/.ssh/ > /dev/null 2>&1
 
-sleep 5s
+sleep 10s
 #read -p  "Enter wait.."
-ssh -i $public_key ubuntu@$floating_ip_bastion "ansible-playbook -i ~/.ssh/hosts ~/.ssh/site.yaml "
-
+ssh -i $public_key ubuntu@$floating_ip_bastion "ansible-playbook -i ~/.ssh/hosts ~/.ssh/site.yaml " > /dev/null 2>&1
+current_time=$(date +"%H:%M:%S")
 for ((i=1; i<=$local_active_hosts; i++))
 do
-    echo "Request $i:"
+    echo "$current_date $current_time Request $i:"
     curl http://$floating_ip_proxy
     echo "================"
 done
@@ -351,7 +380,7 @@ done
 #================================================================================================== Delete
  
 elif [ "$local_active_hosts" -lt "$active_hosts_remote" ]; then
-    echo "Number of active hosts on the local server ($local_active_hosts) is less than active_hosts_remote ($active_hosts_remote).  new server will be deleted."
+    echo "$current_date $current_time Number of active hosts on the local server ($local_active_hosts) is less than active_hosts_remote ($active_hosts_remote).  server(s) will be deleted."
     
 
 difference=$((active_hosts_remote-local_active_hosts ))
@@ -359,8 +388,8 @@ difference=$((active_hosts_remote-local_active_hosts ))
 for ((i=1; i<=$difference; i++)); do
 sleep 10s
 # Find servers containing "dev" in their names
-server_list1=$(openstack server list  -c ID -c Name -f value | grep dev)
-echo " server list is $server_list1"
+server_list1=$(openstack server list  --status ACTIVE -c ID -c Name -f value | grep dev)
+#echo " server list is $server_list1"
 
 # Check if there are any dev servers
 if [[ -z $server_list ]]; then
@@ -375,7 +404,8 @@ server_id=$(echo "$server_list1" | head -n 1 | awk '{print $1}')
 
 # Delete the first server
 openstack server delete "$server_id"
-echo "Deleting server: $server_id"
+current_time=$(date +"%H:%M:%S")
+echo "$current_date $current_time Deleting server: $server_id"
 done
 
 
@@ -384,8 +414,8 @@ sleep 5s
 #read -p  "wait.."
 
 # Fetch the server list from OpenStack
-server_list=$(openstack server list -c Name -f value)
-echo "server list is $server_list"
+server_list=$(openstack server list --status ACTIVE -c Name -f value)
+#echo "server list is $server_list"
 sleep 5s
 
 # Create the hosts file
@@ -411,14 +441,14 @@ ${tag}_proxy
 [all:vars]
 ansible_user=ubuntu
 EOF
-
-echo "The 'hosts' file has been created successfully."
+current_time=$(date +"%H:%M:%S")
+echo "$current_date $current_time The 'hosts' file has been created successfully."
 
 #read -p  "wait.."
 sleep 5s
 
 # Fetch the server list from OpenStack
-server_list=$(openstack server list -c Name -c Networks -f value)
+server_list=$(openstack server list --status ACTIVE  -c Name -c Networks -f value)
 
 # Create the ssh_config file
 cat <<EOF >config
@@ -458,17 +488,17 @@ EOF
   fi
 done <<< "$server_list"
 
-echo "The 'ssh_config' file has been created successfully." 
- 
+echo "$current_date $current_time The 'ssh_config' file has been created successfully." 
+current_time=$(date +"%H:%M:%S") 
  # Copy the Host and config to the Bastion server
-echo "Copying config ssh and host to the Bastion server"
-scp  -o StrictHostKeyChecking=no config ubuntu@$floating_ip_bastion:~/.ssh
-scp  -o BatchMode=yes hosts ubuntu@$floating_ip_bastion:~/.ssh/
-ssh -i $public_key ubuntu@$floating_ip_bastion "ansible-playbook -i ~/.ssh/hosts ~/.ssh/site.yaml "
+echo "$current_date $current_time Copying config ssh and host to the Bastion server"
+scp  -o StrictHostKeyChecking=no config ubuntu@$floating_ip_bastion:~/.ssh > /dev/null 2>&1
+scp  -o BatchMode=yes hosts ubuntu@$floating_ip_bastion:~/.ssh/ > /dev/null 2>&1
+ssh -i $public_key ubuntu@$floating_ip_bastion "ansible-playbook -i ~/.ssh/hosts ~/.ssh/site.yaml " > /dev/null 2>&1
 
 for ((i=1; i<=$local_active_hosts; i++))
 do
-    echo "Request $i:"
+    echo "$current_date $current_time Request $i:"
     curl http://$floating_ip_proxy
     echo "================"
 done
@@ -477,10 +507,11 @@ done
     
     
 else
-   echo "Number of active hosts on the local server ($local_active_hosts) is equal than active_hosts_remote ($active_hosts_remote). No new server will be created."
+   current_time=$(date +"%H:%M:%S")
+   echo "$current_date $current_time Number of active hosts on the local server ($local_active_hosts) is equal to active_hosts_remote ($active_hosts_remote) ."
    for ((i=1; i<=$local_active_hosts ; i++))
 do
-    echo "Request $i:"
+    echo "$current_date $current_time Request $i:"
     curl http://$floating_ip_proxy
     echo "================"
 done
@@ -488,7 +519,9 @@ done
  
    
 fi
-echo " Waiting for 30s..."
+echo "================"
+current_time=$(date +"%H:%M:%S")
+echo "$current_date $current_time Waiting for 30s..."
 sleep 30
 done
 
