@@ -258,7 +258,7 @@ local_active_hosts=$(cat server.conf | grep -oE '[0-9]+')
 current_time=$(date +"%H:%M:%S")
 # Compare local_active_hosts with active_hosts_remote
 if [ "$local_active_hosts" -gt "$active_hosts_remote" ]; then
-    echo "$current_date $current_time Number of active hosts on the local server ($local_active_hosts) is greater than active_hosts_remote ($active_hosts_remote). Creating a new server."
+    echo "$current_date $current_time Number of active hosts on the local server ($local_active_hosts) is greater than active_hosts_remote ($active_hosts_remote). Creating  new server(s)."
 
     # Calculate the difference between local_active_hosts and active_hosts_remote
 difference=$((local_active_hosts - active_hosts_remote))
@@ -280,7 +280,7 @@ difference=$((local_active_hosts - active_hosts_remote))
 
         # Create the new server instance with the same configuration as the previous servers
         openstack server create --flavor "$flavor" --image "$image_id" --network "$network_name" \
-            --security-group "$security_group" --key-name "$key_name" "$server_name"  
+            --security-group "$security_group" --key-name "$key_name" "$server_name"  > /dev/null
 current_time=$(date +"%H:%M:%S")
         echo "$current_date $current_time New server created with the name '$server_name'"
     done
@@ -318,6 +318,7 @@ current_time=$(date +"%H:%M:%S")
 echo "$current_date $current_time The 'hosts' file has been created successfully." 
 #======================================================================
 # Fetch the server list from OpenStack
+#server_list=$(openstack server list --status ACTIVE -c Name -f value)
 server_list=$(openstack server list -c Name -c Networks -f value)
 
 # Create the ssh_config file
@@ -329,7 +330,7 @@ EOF
 while read -r server_name server_networks; do
   if [[ "$server_name" == *"dev"* ]]; then
     # Extract the IP address from the server networks
-    server_ip=$(openstack server show --status ACTIVE -f value -c addresses "$server_name" | grep -oE '[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+' | head -n 1)
+    server_ip=$(openstack server show -f value -c addresses "$server_name" | grep -oE '[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+' | head -n 1)
 
     # Add the SSH configuration for the server
     cat <<EOF >>config

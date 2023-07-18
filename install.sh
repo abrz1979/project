@@ -39,7 +39,7 @@ proxy_server_name="${tag}_proxy"
 image_name="Ubuntu 22.04"
 
 # Set the flavor
-flavor="1C-2GB-20GB"
+flavor="1C-2GB"
 
 # Set the security group
 security_group="${tag}_securitygroup"
@@ -49,6 +49,35 @@ current_date=$(date +"%Y-%m-%d")
 
 
 start_time=$(date +%s)
+
+current_time=$(date +"%H:%M:%S")
+echo -e "$current_date $current_time Deploymnet is in progess ....  \n"
+ 
+current_time=$(date +"%H:%M:%S")
+if [ -e "$public_key" ]; then
+    echo "$current_date $current_time Key $public_key exists."
+else
+    echo "\033[31mError: $current_date $current_time Key $public_key does not exist."
+    exit 1
+fi
+ 
+current_time=$(date +"%H:%M:%S")
+if [ -e "$private_key" ]; then
+    echo "$current_date $current_time Key $private_key exists."
+else
+    echo "\033[31mError: $current_date $current_time Key $private_key does not exist."
+    exit 1
+fi
+
+current_time=$(date +"%H:%M:%S")
+if openstack flavor show "$flavor" >/dev/null 2>&1; then
+    echo "$current_date $current_time Flavor $flavor exists."
+else
+    echo -e "\033[31mError:$current_date $current_time Flavor $flavor does not exist.Please replace with desire one. Exiting program."
+    exit 1
+fi
+
+
 # echo "creating publickey"
 # Generate public key file from private key
 #ssh-keygen -y -f "$private_key" > "$public_key"
@@ -74,8 +103,7 @@ ${tag}_bastion
 ansible_user=ubuntu
 EOF
 
-current_time=$(date +"%H:%M:%S")
-echo -e "$current_date $current_time Deploymnet is in progess ....  \n"
+
 # Find the external network
 external_net=$(openstack network list --external --format value -c ID)
 if [ -z "$external_net" ]; then
@@ -123,7 +151,7 @@ if [ -n "$network_exists" ]; then
     echo "$current_date $current_time  network with the tag '$tag' already exists: $network_name.Skipping network creation."
 else
     # Create the network with the specified name and tag
-    openstack network create "$network_name" --tag "$tag" > /dev/null 2>&1
+    openstack network create "$network_name" --tag "$tag" > /dev/null 
     echo "$current_date $current_time Network created with the name  $network_name"
 fi
 
@@ -134,7 +162,7 @@ if [ -n "$key_exists" ]; then
     echo "$current_date $current_time The key with the name '$key_name' already exists. Skipping key creation."
 else
     # Create the keypair with the specified public key and name
-    openstack keypair create --public-key "$public_key" "$key_name" > /dev/null 2>&1
+    openstack keypair create --public-key "$public_key" "$key_name" > /dev/null
     echo "$current_date $current_time Key created with the name '$key_name'"
 fi
 
@@ -147,13 +175,14 @@ if [ -n "$existing_group" ]; then
 else
 
 # Create the security group
-openstack security group create --description "Security group with tag: $security_group" "$security_group" > /dev/null 2>&1
+openstack security group create --description "Security group with tag: $security_group" "$security_group" > /dev/null 
 # Add rules to allow SSH, SNMP, and ICMP traffic
-
-openstack security group rule create --protocol tcp --dst-port 22:22 --ingress "$security_group" > /dev/null 2>&1
-openstack security group rule create --protocol udp --dst-port 161:161 --ingress "$security_group" > /dev/null 2>&1
-openstack security group rule create --protocol tcp --dst-port 80:80 --ingress "$security_group" > /dev/null 2>&1
-openstack security group rule create --protocol icmp "$security_group" > /dev/null 2>&1
+current_time=$(date +"%H:%M:%S")
+echo "$current_date $current_time Adding rules to $security_groupss"
+openstack security group rule create --protocol tcp --dst-port 22:22 --ingress "$security_group" > /dev/null 
+openstack security group rule create --protocol udp --dst-port 161:161 --ingress "$security_group" > /dev/null 
+openstack security group rule create --protocol tcp --dst-port 80:80 --ingress "$security_group" > /dev/null 
+openstack security group rule create --protocol icmp "$security_group" > /dev/null 
 #openstack security group rule create --protocol any --ingress "$security_group"
 echo "$current_date $current_time Security rule added to security group"
 
@@ -177,7 +206,7 @@ else
     # Create the subnet with the specified network name and subnet details
    subnet_id=$( openstack subnet create --network "$network_name" --dhcp --ip-version 4 \
         --subnet-range 10.0.0.0/24 --allocation-pool start=10.0.0.100,end=10.0.0.200 \
-        --dns-nameserver 1.1.1.1 "$subnet_name" -f value -c id ) > /dev/null 2>&1
+        --dns-nameserver 1.1.1.1 "$subnet_name" -f value -c id ) > /dev/null 
     echo "$current_date $current_time Subnet created with the name '$subnet_name' and  ID '$subnet_id' "
 fi
 
@@ -193,7 +222,7 @@ if [ -n "$router_exists" ]; then
     echo "$current_date $current_time The router with the name '$router_name' already exists. Skipping router creation."
 else
     # Create the router with the specified name and tag
-    openstack router create "$router_name" --tag "$tag" --external-gateway "$external_net" > /dev/null 2>&1
+    openstack router create "$router_name" --tag "$tag" --external-gateway "$external_net" > /dev/null 
     echo "$current_date $current_time Router created with the tag '$tag': $router_name" 
 fi
 
@@ -234,7 +263,7 @@ else
     
         # Create the server instance with the specified details
         openstack server create --flavor "$flavor" --image "$image_id" --network "$network_name" \
-            --security-group "$security_group" --key-name "$key_name" "$server_name" > /dev/null 2>&1
+            --security-group "$security_group" --key-name "$key_name" "$server_name" > /dev/null
         echo "$current_date $current_time Bastion server created with the name '$server_name'" 
     fi
 fi
@@ -249,7 +278,7 @@ if [ -n "$proxy_server_exists" ]; then
 else
     # Create the proxy server instance with the same configuration as the Bastion server
     openstack server create --flavor "$flavor" --image "$image_id" --network "$network_name" \
-        --security-group "$security_group" --key-name "$key_name" "$proxy_server_name"  > /dev/null 2>&1
+        --security-group "$security_group" --key-name "$key_name" "$proxy_server_name"  > /dev/null 
     echo "$current_date $current_time Proxy server created with the name '$proxy_server_name'"
 fi
 
@@ -262,7 +291,7 @@ if [ -n "$deva_server_exists" ]; then
 else
     # Create the deva server instance with the same configuration as the previous servers
     openstack server create --flavor "$flavor" --image "$image_id" --network "$network_name" \
-        --security-group "$security_group" --key-name "$key_name" "${tag}_deva" > /dev/null 2>&1
+        --security-group "$security_group" --key-name "$key_name" "${tag}_deva" > /dev/null 
     echo "$current_date $current_time Deva server created with the name '${tag}_deva'"
 fi
 
@@ -275,7 +304,7 @@ if [ -n "$devb_server_exists" ]; then
 else
     # Create the devb server instance with the same configuration as the previous servers
     openstack server create --flavor "$flavor" --image "$image_id" --network "$network_name" \
-        --security-group "$security_group" --key-name "$key_name" "${tag}_devb" > /dev/null 2>&1
+        --security-group "$security_group" --key-name "$key_name" "${tag}_devb" > /dev/null 
     echo "$current_date $current_time Devb server created with the name '${tag}_devb'"
 fi
 
@@ -288,7 +317,7 @@ if [ -n "$devc_server_exists" ]; then
 else
     # Create the devc server instance with the same configuration as the previous servers
     openstack server create --flavor "$flavor" --image "$image_id" --network "$network_name" \
-        --security-group "$security_group" --key-name "$key_name" "${tag}_devc" > /dev/null 2>&1
+        --security-group "$security_group" --key-name "$key_name" "${tag}_devc" > /dev/null 
     echo "$current_date $current_time Devc server created with the name '${tag}_devc'"
 fi
 current_time=$(date +"%H:%M:%S")
@@ -371,7 +400,7 @@ echo "  User ubuntu" >> "$ssh_config_file"
 echo " StrictHostKeyChecking no" >> "$ssh_config_file"
 echo "  IdentityFile ~/.ssh/$private_key" >> "$ssh_config_file"
 
-echo "$current_time=$(date +"%H:%M:%S") Base SSH configuration file created: $ssh_config_file"
+echo "$current_date $current_time Base SSH configuration file created: $ssh_config_file"
 
 current_time=$(date +"%H:%M:%S")
 # Install Ansible on the server
@@ -393,17 +422,17 @@ echo "$current_date $current_time Ansible installed successfully"
 current_time=$(date +"%H:%M:%S")
 # Copy the public key to the Bastion server
 echo "$current_date $current_time Copying public key to the Bastion server"
-scp  -o StrictHostKeyChecking=no $public_key ubuntu@$floating_ip_bastion:~/.ssh > /dev/null 2>&1
-scp  -o BatchMode=yes $private_key ubuntu@$floating_ip_bastion:~/.ssh > /dev/null 2>&1
-scp  -o BatchMode=yes  $ssh_config_file ubuntu@$floating_ip_bastion:~/.ssh > /dev/null 2>&1
+scp  -o StrictHostKeyChecking=no $public_key ubuntu@$floating_ip_bastion:~/.ssh  
+scp  -o BatchMode=yes $private_key ubuntu@$floating_ip_bastion:~/.ssh 
+scp  -o BatchMode=yes  $ssh_config_file ubuntu@$floating_ip_bastion:~/.ssh 
 #scp  -o BatchMode=yes  -r ansible ubuntu@$floating_ip_bastion:~/.ssh
-scp  -o BatchMode=yes  application2.py ubuntu@$floating_ip_bastion:~/.ssh > /dev/null 2>&1
-scp  -o BatchMode=yes  haproxy.cfg.j2 ubuntu@$floating_ip_bastion:~/.ssh > /dev/null 2>&1
-scp  -o BatchMode=yes  hosts ubuntu@$floating_ip_bastion:~/.ssh > /dev/null 2>&1
-scp  -o BatchMode=yes  my_flask_app.service ubuntu@$floating_ip_bastion:~/.ssh > /dev/null 2>&1
-scp  -o BatchMode=yes  site.yaml ubuntu@$floating_ip_bastion:~/.ssh > /dev/null 2>&1
-scp  -o BatchMode=yes  config ubuntu@$floating_ip_bastion:~/.ssh > /dev/null 2>&1
-scp  -o BatchMode=yes  snmpd.conf ubuntu@$floating_ip_bastion:~/.ssh > /dev/null 2>&1
+scp  -o BatchMode=yes  application2.py ubuntu@$floating_ip_bastion:~/.ssh 
+scp  -o BatchMode=yes  haproxy.cfg.j2 ubuntu@$floating_ip_bastion:~/.ssh 
+scp  -o BatchMode=yes  hosts ubuntu@$floating_ip_bastion:~/.ssh 
+scp  -o BatchMode=yes  my_flask_app.service ubuntu@$floating_ip_bastion:~/.ssh 
+scp  -o BatchMode=yes  site.yaml ubuntu@$floating_ip_bastion:~/.ssh 
+scp  -o BatchMode=yes  config ubuntu@$floating_ip_bastion:~/.ssh 
+scp  -o BatchMode=yes  snmpd.conf ubuntu@$floating_ip_bastion:~/.ssh 
 
 
 ssh -i $public_key ubuntu@$floating_ip_bastion "ansible-playbook -i ~/.ssh/hosts ~/.ssh/site.yaml " 

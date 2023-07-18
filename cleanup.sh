@@ -127,7 +127,7 @@ fi
 
 # Check if the router exists
 current_time=$(date +"%H:%M:%S")
-openstack router show "$router_name" > /dev/null 2>&1
+openstack router show "$router_name" > /dev/null 
 if [ $? -eq 0 ]; then
   # Find the subnet based on the tag
   subnet_name="${tag}_subnet"
@@ -165,7 +165,7 @@ fi
 # Delete the network
 current_time=$(date +"%H:%M:%S")
 network_name="${tag}_network"
-openstack network delete "$network_name" > /dev/null 2>&1
+openstack network delete "$network_name" > /dev/null 
 if [ $? -eq 0 ]; then
   echo "$current_date $current_time Network '$network_name' deleted."
 else
