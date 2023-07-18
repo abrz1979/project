@@ -422,20 +422,20 @@ echo "$current_date $current_time Ansible installed successfully"
 current_time=$(date +"%H:%M:%S")
 # Copy the public key to the Bastion server
 echo "$current_date $current_time Copying public key to the Bastion server"
-scp  -o StrictHostKeyChecking=no $public_key ubuntu@$floating_ip_bastion:~/.ssh  
-scp  -o BatchMode=yes $private_key ubuntu@$floating_ip_bastion:~/.ssh 
-scp  -o BatchMode=yes  $ssh_config_file ubuntu@$floating_ip_bastion:~/.ssh 
+scp  -o StrictHostKeyChecking=no $public_key ubuntu@$floating_ip_bastion:~/.ssh  > /dev/null
+scp  -o BatchMode=yes $private_key ubuntu@$floating_ip_bastion:~/.ssh  > /dev/null
+scp  -o BatchMode=yes  $ssh_config_file ubuntu@$floating_ip_bastion:~/.ssh > /dev/null
 #scp  -o BatchMode=yes  -r ansible ubuntu@$floating_ip_bastion:~/.ssh
-scp  -o BatchMode=yes  application2.py ubuntu@$floating_ip_bastion:~/.ssh 
-scp  -o BatchMode=yes  haproxy.cfg.j2 ubuntu@$floating_ip_bastion:~/.ssh 
-scp  -o BatchMode=yes  hosts ubuntu@$floating_ip_bastion:~/.ssh 
-scp  -o BatchMode=yes  my_flask_app.service ubuntu@$floating_ip_bastion:~/.ssh 
-scp  -o BatchMode=yes  site.yaml ubuntu@$floating_ip_bastion:~/.ssh 
-scp  -o BatchMode=yes  config ubuntu@$floating_ip_bastion:~/.ssh 
-scp  -o BatchMode=yes  snmpd.conf ubuntu@$floating_ip_bastion:~/.ssh 
+scp  -o BatchMode=yes  application2.py ubuntu@$floating_ip_bastion:~/.ssh > /dev/null
+scp  -o BatchMode=yes  haproxy.cfg.j2 ubuntu@$floating_ip_bastion:~/.ssh > /dev/null
+scp  -o BatchMode=yes  hosts ubuntu@$floating_ip_bastion:~/.ssh > /dev/null
+scp  -o BatchMode=yes  my_flask_app.service ubuntu@$floating_ip_bastion:~/.ssh > /dev/null
+scp  -o BatchMode=yes  site.yaml ubuntu@$floating_ip_bastion:~/.ssh > /dev/null
+scp  -o BatchMode=yes  config ubuntu@$floating_ip_bastion:~/.ssh > /dev/null
+scp  -o BatchMode=yes  snmpd.conf ubuntu@$floating_ip_bastion:~/.ssh > /dev/null
 
 
-ssh -i $public_key ubuntu@$floating_ip_bastion "ansible-playbook -i ~/.ssh/hosts ~/.ssh/site.yaml " 
+ssh -i $public_key ubuntu@$floating_ip_bastion "ansible-playbook -i ~/.ssh/hosts ~/.ssh/site.yaml " > /dev/null
 current_time=$(date +"%H:%M")
 echo "$current_date $current_time   Site Verification.."
 
