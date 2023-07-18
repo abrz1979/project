@@ -99,7 +99,7 @@ else
 fi
 current_time=$(date +"%H:%M:%S")
 # Delete servers with names starting with the tag
-server_names=$(openstack server list --name "^${tag}*" -f value -c Name)
+server_names=$(openstack server list   -c Name -f value | grep $tag)
 if [ -n "$server_names" ]; then
   while read -r server_name; do
     openstack server delete "$server_name"
