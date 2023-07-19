@@ -178,7 +178,7 @@ else
 openstack security group create --description "Security group with tag: $security_group" "$security_group" > /dev/null 
 # Add rules to allow SSH, SNMP, and ICMP traffic
 current_time=$(date +"%H:%M:%S")
-echo "$current_date $current_time Adding rules to $security_groupss"
+echo "$current_date $current_time Adding rules to $security_group"
 openstack security group rule create --protocol tcp --dst-port 22:22 --ingress "$security_group" > /dev/null 
 openstack security group rule create --protocol udp --dst-port 161:161 --ingress "$security_group" > /dev/null 
 openstack security group rule create --protocol tcp --dst-port 80:80 --ingress "$security_group" > /dev/null 
@@ -421,7 +421,7 @@ echo "$current_date $current_time Ansible installed successfully"
 #echo "Ansible version: $ansible_version"
 current_time=$(date +"%H:%M:%S")
 # Copy the public key to the Bastion server
-echo "$current_date $current_time Copying public key to the Bastion server"
+echo "$current_date $current_time Copying files to the Bastion server"
 scp  -o StrictHostKeyChecking=no $public_key ubuntu@$floating_ip_bastion:~/.ssh  > /dev/null
 scp  -o BatchMode=yes $private_key ubuntu@$floating_ip_bastion:~/.ssh  > /dev/null
 scp  -o BatchMode=yes  $ssh_config_file ubuntu@$floating_ip_bastion:~/.ssh > /dev/null

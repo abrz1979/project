@@ -94,12 +94,12 @@ echo "$current_date $current_time Floating_ip_proxy $floating_ip_proxy"
 #ssh -o StrictHostKeyChecking=no -i $public_key ubuntu@$floating_ip_bastion 'sudo apt install -y influxdb >/dev/null 2>&1'
 #ssh -o StrictHostKeyChecking=no -i $public_key ubuntu@$floating_ip_bastion 'sudo apt install -y influxdb-client >/dev/null 2>&1'
 #sleep 10s
-
-
+current_time=$(date +"%H:%M:%S")
+echo "$current_date $current_time preparing IP addresses"
 while true; do
 # Fetch the server list from OpenStack
 sleep 5s
-server_list=$(openstack server list -c Name -f value)
+server_list=$(openstack server list --status ACTIVE -c Name -f value | grep "^${tag}_" )
 #echo "server list $server_list"
 
 
@@ -178,7 +178,9 @@ unset ip_list
 
 
 # Get the number of servers in OpenStack
-server_num=$(openstack server list --status ACTIVE -c ID -c Name -f value | grep dev | wc -l)
+server_num=$(openstack server list --status ACTIVE -c ID -c Name -f value | grep dev | grep "${tag}_.*dev"  | wc -l)
+
+
 
 # Create the config file
 cat <<EOF > active-server.sh
@@ -211,6 +213,8 @@ fi
 EOF
 # Change the permissions of the created file
 chmod 777 active-server.sh
+
+
 sleep 10s
 #echo "$current_date $current_time active-server file has been created successfully."
 #remote_output=$(ssh -o StrictHostKeyChecking=no -i id_rsa.pub ubuntu@$floating_ip_bastion "bash -s" < active-server.sh)
@@ -288,7 +292,8 @@ current_time=$(date +"%H:%M:%S")
 
 #=============================================================== 
      # Fetch the server list from OpenStack
-server_list=$(openstack server list --status ACTIVE -c Name -f value)
+sleep 10s
+server_list=$(openstack server list --status ACTIVE -c Name -f value | grep "^${tag}_")
 
 # Create the hosts file
 cat <<EOF >hosts
@@ -314,12 +319,14 @@ ${tag}_proxy
 [all:vars]
 ansible_user=ubuntu
 EOF
+
+#read -p "wait"
 current_time=$(date +"%H:%M:%S")
 echo "$current_date $current_time The 'hosts' file has been created successfully." 
 #======================================================================
 # Fetch the server list from OpenStack
 #server_list=$(openstack server list --status ACTIVE -c Name -f value)
-server_list=$(openstack server list -c Name -c Networks -f value)
+server_list=$(openstack server list --status ACTIVE -c Name -f value | grep "^${tag}_")
 
 # Create the ssh_config file
 cat <<EOF >config
@@ -363,12 +370,12 @@ echo "$current_date $current_time The 'ssh_config' file has been created success
 current_time=$(date +"%H:%M:%S")
  # Copy the Host and config to the Bastion server
 echo "$current_date $current_time Copying config ssh and host to the Bastion server"
-scp  -o StrictHostKeyChecking=no config ubuntu@$floating_ip_bastion:~/.ssh > /dev/null 2>&1
-scp  -o BatchMode=yes hosts ubuntu@$floating_ip_bastion:~/.ssh/ > /dev/null 2>&1
+scp  -o StrictHostKeyChecking=no config ubuntu@$floating_ip_bastion:~/.ssh > /dev/null 
+scp  -o BatchMode=yes hosts ubuntu@$floating_ip_bastion:~/.ssh/ > /dev/null 
 
 sleep 10s
 #read -p  "Enter wait.."
-ssh -i $public_key ubuntu@$floating_ip_bastion "ansible-playbook -i ~/.ssh/hosts ~/.ssh/site.yaml " > /dev/null 2>&1
+ssh -i $public_key ubuntu@$floating_ip_bastion "ansible-playbook -i ~/.ssh/hosts ~/.ssh/site.yaml " > /dev/null 
 current_time=$(date +"%H:%M:%S")
 for ((i=1; i<=$local_active_hosts; i++))
 do
@@ -389,7 +396,7 @@ difference=$((active_hosts_remote-local_active_hosts ))
 for ((i=1; i<=$difference; i++)); do
 sleep 10s
 # Find servers containing "dev" in their names
-server_list1=$(openstack server list  --status ACTIVE -c ID -c Name -f value | grep dev)
+server_list1=$(openstack server list  --status ACTIVE -c ID -c Name -f value | grep dev | grep "${tag}_.*dev" )
 #echo " server list is $server_list1"
 
 # Check if there are any dev servers
@@ -415,7 +422,7 @@ sleep 5s
 #read -p  "wait.."
 
 # Fetch the server list from OpenStack
-server_list=$(openstack server list --status ACTIVE -c Name -f value)
+server_list=$(openstack server list --status ACTIVE -c Name -f value | grep "^${tag}_")
 #echo "server list is $server_list"
 sleep 5s
 
@@ -449,7 +456,7 @@ echo "$current_date $current_time The 'hosts' file has been created successfully
 sleep 5s
 
 # Fetch the server list from OpenStack
-server_list=$(openstack server list --status ACTIVE  -c Name -c Networks -f value)
+server_list=$(openstack server list --status ACTIVE  -c Name -c Networks -f value | grep "^${tag}_")
 
 # Create the ssh_config file
 cat <<EOF >config
@@ -523,7 +530,7 @@ fi
 echo "================"
 current_time=$(date +"%H:%M:%S")
 echo "$current_date $current_time Waiting for 30s..."
-sleep 30
+sleep 5
 done
 
 
